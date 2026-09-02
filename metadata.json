@@ -1,0 +1,6 @@
+{
+  "name": "Avid MedEquip | سامانه مدیریت تجهیزات پزشکی آوید",
+  "description": "سامانه هوشمند مدیریت تجهیزات، کتابخانه اسناد و فایل‌ها، انبار، کالیبراسیون، درخواست‌های خرید و تحلیل داده‌های بیمارستانی آوید",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

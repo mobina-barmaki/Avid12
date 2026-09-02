@@ -1,0 +1,2089 @@
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Folder,
+  FolderPlus,
+  FolderTree,
+  FolderOpen,
+  FileText,
+  FileSpreadsheet,
+  FileCode2,
+  FileImage,
+  FileArchive,
+  FileCheck2,
+  File,
+  UploadCloud,
+  Lock,
+  Unlock,
+  KeyRound,
+  Eye,
+  Download,
+  Trash2,
+  Star,
+  Search,
+  Grid,
+  List,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUp,
+  RotateCw,
+  HardDrive,
+  Award,
+  Wrench,
+  AlertTriangle,
+  BarChart3,
+  BookOpen,
+  ShieldCheck,
+  Shield,
+  UserCheck,
+  Clock,
+  Tag,
+  Calendar,
+  User,
+  Building2,
+  CheckCircle2,
+  X,
+  Plus,
+  Info,
+  ExternalLink,
+  Printer,
+  Share2,
+  Sparkles,
+  SlidersHorizontal,
+  Layers,
+  Cpu,
+  RefreshCw,
+} from 'lucide-react';
+import {
+  AppUser,
+  EquipmentItem,
+  CalibrationRecord,
+  FailureReport,
+  TaskEvent,
+  PurchaseRequest,
+  HospitalDocumentFolder,
+  HospitalDocumentFile,
+  HospitalDocCategory,
+  HospitalDocExtension,
+  PageId,
+} from '../../types';
+import { INITIAL_DOCUMENT_FOLDERS, INITIAL_DOCUMENT_FILES, generateAutoSyncedDocuments } from '../../data/mockDocuments';
+
+interface DocumentLibraryViewProps {
+  currentUser?: AppUser;
+  equipmentList: EquipmentItem[];
+  calibrationsList: CalibrationRecord[];
+  failuresList: FailureReport[];
+  tasksList: TaskEvent[];
+  purchaseRequests: PurchaseRequest[];
+  setActivePage?: (page: PageId) => void;
+  onSelectEquipment?: (eq: EquipmentItem) => void;
+}
+
+type QuickFilter = 'all' | 'starred' | 'locked' | 'my_uploads' | 'auto_synced';
+type ViewMode = 'grid' | 'details_list';
+type SortField = 'name' | 'date' | 'size' | 'category';
+
+export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
+  currentUser,
+  equipmentList,
+  calibrationsList,
+  failuresList,
+  tasksList,
+  purchaseRequests,
+  setActivePage,
+  onSelectEquipment,
+}) => {
+  // -------------------------------------------------------------
+  // STATE MANAGEMENT
+  // -------------------------------------------------------------
+  const [folders, setFolders] = useState<HospitalDocumentFolder[]>(INITIAL_DOCUMENT_FOLDERS);
+  
+  // Combine static initial files with live auto-synced documents
+  const initialSynced = useMemo(() => {
+    return generateAutoSyncedDocuments(
+      equipmentList,
+      calibrationsList,
+      failuresList,
+      tasksList,
+      purchaseRequests
+    );
+  }, [equipmentList, calibrationsList, failuresList, tasksList, purchaseRequests]);
+
+  const [files, setFiles] = useState<HospitalDocumentFile[]>([
+    ...INITIAL_DOCUMENT_FILES,
+    ...initialSynced,
+  ]);
+
+  // Current navigation state (Windows Explorer style)
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null); // null = Root (C:\)
+  const [folderHistory, setFolderHistory] = useState<(string | null)[]>([null]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+
+  // Filters & Views
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [sortBy, setSortBy] = useState<SortField>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Modals
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState<boolean>(false);
+  const [previewFile, setPreviewFile] = useState<HospitalDocumentFile | null>(null);
+  
+  // Security / Password Unlock Modal
+  const [lockedTarget, setLockedTarget] = useState<{
+    type: 'file' | 'folder';
+    item: HospitalDocumentFile | HospitalDocumentFolder;
+  } | null>(null);
+  const [enteredPassword, setEnteredPassword] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [unlockedItemIds, setUnlockedItemIds] = useState<Set<string>>(new Set());
+
+  // Set Password Modal
+  const [setPasswordTarget, setSetPasswordTarget] = useState<HospitalDocumentFile | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState<string>('');
+  const [newPasswordHintInput, setNewPasswordHintInput] = useState<string>('');
+
+  // Toast Notification
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // -------------------------------------------------------------
+  // RE-SYNC WITH HOSPITAL LIVE DATA
+  // -------------------------------------------------------------
+  const handleSyncData = () => {
+    const freshSynced = generateAutoSyncedDocuments(
+      equipmentList,
+      calibrationsList,
+      failuresList,
+      tasksList,
+      purchaseRequests
+    );
+
+    // Keep user uploaded files and update synced files
+    setFiles((prev) => {
+      const userFiles = prev.filter((f) => !f.isAutoGenerated);
+      return [...userFiles, ...INITIAL_DOCUMENT_FILES, ...freshSynced];
+    });
+
+    showToast('همگام‌سازی اسناد گواهی‌ها، سوابق تعمیرات و گزارش‌ها با موفقیت انجام گردید.');
+  };
+
+  // -------------------------------------------------------------
+  // BREADCRUMB & NAVIGATION LOGIC
+  // -------------------------------------------------------------
+  const currentFolder = useMemo(() => {
+    if (!currentFolderId) return null;
+    return folders.find((f) => f.id === currentFolderId) || null;
+  }, [currentFolderId, folders]);
+
+  const breadcrumbs = useMemo(() => {
+    const list: { id: string | null; name: string }[] = [{ id: null, name: 'حافظه اسناد بیمارستان (C:)' }];
+    if (!currentFolderId) return list;
+
+    let curr: HospitalDocumentFolder | undefined = folders.find((f) => f.id === currentFolderId);
+    const trail: { id: string; name: string }[] = [];
+
+    while (curr) {
+      trail.unshift({ id: curr.id, name: curr.name });
+      if (!curr.parentId) break;
+      curr = folders.find((f) => f.id === curr!.parentId);
+    }
+
+    return [...list, ...trail];
+  }, [currentFolderId, folders]);
+
+  const navigateToFolder = (folderId: string | null) => {
+    if (folderId === currentFolderId) return;
+
+    // Check if target folder is locked and not yet unlocked
+    if (folderId) {
+      const targetFld = folders.find((f) => f.id === folderId);
+      if (targetFld?.isLocked && targetFld.password && !unlockedItemIds.has(targetFld.id)) {
+        setLockedTarget({ type: 'folder', item: targetFld });
+        setEnteredPassword('');
+        setPasswordError(null);
+        return;
+      }
+    }
+
+    const newHistory = folderHistory.slice(0, historyIndex + 1);
+    newHistory.push(folderId);
+    setFolderHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    setCurrentFolderId(folderId);
+  };
+
+  const handleGoBack = () => {
+    if (historyIndex > 0) {
+      const newIdx = historyIndex - 1;
+      setHistoryIndex(newIdx);
+      setCurrentFolderId(folderHistory[newIdx]);
+    }
+  };
+
+  const handleGoForward = () => {
+    if (historyIndex < folderHistory.length - 1) {
+      const newIdx = historyIndex + 1;
+      setHistoryIndex(newIdx);
+      setCurrentFolderId(folderHistory[newIdx]);
+    }
+  };
+
+  const handleGoUp = () => {
+    if (!currentFolder) return;
+    navigateToFolder(currentFolder.parentId);
+  };
+
+  // -------------------------------------------------------------
+  // FILTERING & SORTING
+  // -------------------------------------------------------------
+  const visibleFolders = useMemo(() => {
+    if (quickFilter !== 'all' && quickFilter !== 'locked') {
+      return []; // Subfolders hidden when viewing flat filter lists
+    }
+
+    let result = folders.filter((f) => f.parentId === currentFolderId);
+
+    if (quickFilter === 'locked') {
+      result = folders.filter((f) => f.isLocked);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = folders.filter((f) => f.name.toLowerCase().includes(q) || f.description?.toLowerCase().includes(q));
+    }
+
+    return result;
+  }, [folders, currentFolderId, quickFilter, searchQuery]);
+
+  const visibleFiles = useMemo(() => {
+    let result = files;
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (f) =>
+          f.title.toLowerCase().includes(q) ||
+          f.originalFileName.toLowerCase().includes(q) ||
+          f.equipmentCode?.toLowerCase().includes(q) ||
+          f.equipmentName?.toLowerCase().includes(q) ||
+          f.department?.toLowerCase().includes(q) ||
+          f.tags?.some((t) => t.toLowerCase().includes(q)) ||
+          f.description?.toLowerCase().includes(q)
+      );
+      return result;
+    }
+
+    // Quick filter
+    if (quickFilter === 'starred') {
+      result = result.filter((f) => f.isStarred);
+    } else if (quickFilter === 'locked') {
+      result = result.filter((f) => f.isLocked);
+    } else if (quickFilter === 'my_uploads') {
+      result = result.filter((f) => !f.isAutoGenerated || f.uploadedByName === currentUser?.name);
+    } else if (quickFilter === 'auto_synced') {
+      result = result.filter((f) => f.isAutoGenerated);
+    } else {
+      // Normal Folder navigation
+      result = result.filter((f) => f.folderId === currentFolderId);
+    }
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      result = result.filter((f) => f.category === selectedCategory);
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'name') {
+        cmp = a.title.localeCompare(b.title, 'fa');
+      } else if (sortBy === 'date') {
+        cmp = a.uploadDate.localeCompare(b.uploadDate, 'fa');
+      } else if (sortBy === 'size') {
+        cmp = a.fileSizeBytes - b.fileSizeBytes;
+      } else if (sortBy === 'category') {
+        cmp = a.category.localeCompare(b.category);
+      }
+      return sortOrder === 'asc' ? cmp : -cmp;
+    });
+
+    return result;
+  }, [files, currentFolderId, quickFilter, searchQuery, selectedCategory, sortBy, sortOrder, currentUser]);
+
+  // -------------------------------------------------------------
+  // STATS & DISK CAPACITY
+  // -------------------------------------------------------------
+  const totalSizeBytes = useMemo(() => {
+    return files.reduce((acc, f) => acc + f.fileSizeBytes, 0);
+  }, [files]);
+
+  const totalSizeGB = (totalSizeBytes / (1024 * 1024 * 1024)).toFixed(2);
+  const maxCapacityGB = 50.0;
+  const capacityPercent = Math.min(100, Math.round((parseFloat(totalSizeGB) / maxCapacityGB) * 100));
+
+  const totalCalibrationsCount = files.filter((f) => f.category === 'calibration').length;
+  const totalRepairsCount = files.filter((f) => f.category === 'repairs').length;
+  const totalFailuresCount = files.filter((f) => f.category === 'failures').length;
+  const totalManualsCount = files.filter((f) => f.category === 'equipment_manuals').length;
+  const totalLockedCount = files.filter((f) => f.isLocked).length + folders.filter((fld) => fld.isLocked).length;
+
+  // -------------------------------------------------------------
+  // PASSWORD VERIFICATION & ACTIONS
+  // -------------------------------------------------------------
+  const handleOpenItem = (item: HospitalDocumentFile | HospitalDocumentFolder, type: 'file' | 'folder') => {
+    if (item.isLocked && item.password && !unlockedItemIds.has(item.id)) {
+      setLockedTarget({ type, item });
+      setEnteredPassword('');
+      setPasswordError(null);
+      return;
+    }
+
+    if (type === 'folder') {
+      navigateToFolder(item.id);
+    } else {
+      setPreviewFile(item as HospitalDocumentFile);
+    }
+  };
+
+  const handleVerifyPassword = () => {
+    if (!lockedTarget) return;
+
+    if (enteredPassword.trim() === lockedTarget.item.password) {
+      setUnlockedItemIds((prev) => new Set(prev).add(lockedTarget.item.id));
+      const target = lockedTarget;
+      setLockedTarget(null);
+      setEnteredPassword('');
+      setPasswordError(null);
+
+      if (target.type === 'folder') {
+        navigateToFolder(target.item.id);
+      } else {
+        setPreviewFile(target.item as HospitalDocumentFile);
+      }
+      showToast('رمز عبور تایید شد. سند با موفقیت باز گردید.');
+    } else {
+      setPasswordError('رمز عبور وارد شده نادرست است. لطفاً مجدداً بررسی فرمایید.');
+    }
+  };
+
+  const handleToggleStar = (fileId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setFiles((prev) =>
+      prev.map((f) => (f.id === fileId ? { ...f, isStarred: !f.isStarred } : f))
+    );
+  };
+
+  const handleDeleteFile = (fileId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const target = files.find((f) => f.id === fileId);
+    if (!target) return;
+    if (window.confirm(`آیا از حذف سند «${target.title}» اطمینان دارید؟`)) {
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      if (previewFile?.id === fileId) setPreviewFile(null);
+      showToast(`سند «${target.title}» حذف گردید.`);
+    }
+  };
+
+  const handleDeleteFolder = (folderId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const target = folders.find((f) => f.id === folderId);
+    if (!target) return;
+    if (target.isSystemRoot) {
+      alert('پوشه‌های ریشه سیستمی قابل حذف نیستند.');
+      return;
+    }
+    if (window.confirm(`آیا از حذف پوشه «${target.name}» و انتقال فایل‌های آن به ریشه اطمینان دارید؟`)) {
+      setFolders((prev) => prev.filter((f) => f.id !== folderId));
+      // Re-link files inside this folder to parent
+      setFiles((prev) =>
+        prev.map((f) => (f.folderId === folderId ? { ...f, folderId: target.parentId || 'fld-root-custom' } : f))
+      );
+      if (currentFolderId === folderId) setCurrentFolderId(target.parentId);
+      showToast(`پوشه «${target.name}» حذف شد.`);
+    }
+  };
+
+  const handleSaveFilePassword = () => {
+    if (!setPasswordTarget) return;
+
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id !== setPasswordTarget.id) return f;
+        if (!newPasswordInput.trim()) {
+          // Remove password
+          return {
+            ...f,
+            isLocked: false,
+            password: undefined,
+            passwordHint: undefined,
+            isConfidential: false,
+          };
+        } else {
+          // Set password
+          return {
+            ...f,
+            isLocked: true,
+            password: newPasswordInput.trim(),
+            passwordHint: newPasswordHintInput.trim() || undefined,
+            isConfidential: true,
+          };
+        }
+      })
+    );
+
+    showToast(
+      newPasswordInput.trim()
+        ? `رمز عبور با موفقیت برای سند «${setPasswordTarget.title}» فعال گردید.`
+        : `رمز عبور سند حذف گردید.`
+    );
+    setSetPasswordTarget(null);
+    setNewPasswordInput('');
+    setNewPasswordHintInput('');
+  };
+
+  // -------------------------------------------------------------
+  // HELPER: RENDER FILE ICON
+  // -------------------------------------------------------------
+  const renderFileIcon = (ext: HospitalDocExtension, size = 'w-8 h-8') => {
+    switch (ext) {
+      case 'pdf':
+        return <FileText className={`${size} text-rose-500`} />;
+      case 'xlsx':
+        return <FileSpreadsheet className={`${size} text-emerald-600`} />;
+      case 'docx':
+      case 'txt':
+        return <FileCode2 className={`${size} text-blue-600`} />;
+      case 'jpg':
+      case 'png':
+        return <FileImage className={`${size} text-amber-500`} />;
+      case 'zip':
+        return <FileArchive className={`${size} text-purple-500`} />;
+      case 'dicom':
+        return <Cpu className={`${size} text-teal-600`} />;
+      default:
+        return <File className={`${size} text-slate-500`} />;
+    }
+  };
+
+  const getCategoryBadge = (cat: HospitalDocCategory) => {
+    switch (cat) {
+      case 'calibration':
+        return { label: 'گواهی کالیبراسیون', bg: 'bg-sky-50 text-sky-700 border-sky-200' };
+      case 'repairs':
+        return { label: 'تعمیرات و PM', bg: 'bg-blue-50 text-blue-700 border-blue-200' };
+      case 'failures':
+        return { label: 'گزارش خرابی', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
+      case 'periodic_reports':
+        return { label: 'گزارش آماری دوره‌ای', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
+      case 'equipment_manuals':
+        return { label: 'شناسنامه و کاتالوگ', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      case 'purchase_invoices':
+        return { label: 'پیش‌فاکتور و مالی', bg: 'bg-amber-50 text-amber-700 border-amber-200' };
+      case 'clinical_guidelines':
+        return { label: 'پروتکل بالینی و ایمنی', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200' };
+      default:
+        return { label: 'سند بیمارستانی', bg: 'bg-slate-100 text-slate-700 border-slate-200' };
+    }
+  };
+
+  return (
+    <div className="space-y-4 pb-12 dir-rtl text-right font-farsi select-none">
+      {/* ========================================================= */}
+      {/* 1. TOP WINDOWS SYSTEM RIBBON & STORAGE STATUS BAR          */}
+      {/* ========================================================= */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-700 text-white flex items-center justify-center shadow-md shrink-0">
+              <HardDrive className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-black text-slate-900 tracking-tight">
+                  کتابخانه اسناد و فایل‌های بیمارستان
+                </h1>
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 border border-sky-200 dir-ltr">
+                  Drive (C:)
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  دسترسی عمومی کلیه پرسنل
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                آرشیو خودکار گواهی‌های کالیبراسیون، سوابق تعمیرات و نگهداری، گزارش‌های خرابی و امکان ایجاد پوشه، بارگذاری فایل و رمزگذاری
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons Toolbar (Windows Ribbon) */}
+          <div className="flex items-center flex-wrap gap-2 shrink-0">
+            <button
+              onClick={() => setIsNewFolderModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <FolderPlus className="w-4 h-4 text-sky-600" />
+              <span>پوشه جدید</span>
+            </button>
+
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>بارگذاری سند جدید</span>
+            </button>
+
+            <button
+              onClick={handleSyncData}
+              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-200"
+              title="همگام‌سازی لحظه‌ای با گواهی‌ها، سوابق تعمیرات و خرابی‌های جدید"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">همگام‌سازی خودکار</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Windows Drive Storage Capacity Indicator */}
+        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+            <HardDrive className="w-4 h-4 text-slate-500" />
+            <span>ظرفیت حافظه دیسک اسناد:</span>
+            <span className="text-sky-700 font-black">{totalSizeGB} GB</span>
+            <span className="text-slate-400">از {maxCapacityGB} GB</span>
+            <span className="text-[11px] text-slate-400 font-normal">({files.length} سند، {folders.length} پوشه)</span>
+          </div>
+
+          <div className="flex items-center gap-4 flex-1 max-w-md">
+            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/80">
+              <div
+                className="h-full bg-gradient-to-r from-sky-500 to-blue-600 rounded-full transition-all duration-500"
+                style={{ width: `${capacityPercent}%` }}
+              />
+            </div>
+            <span className="text-xs font-black text-slate-600 shrink-0">{capacityPercent}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 2. WINDOWS EXPLORER MAIN SHELL (SIDEBAR + CONTENT + PANE)  */}
+      {/* ========================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        
+        {/* ------------------------------------------------------- */}
+        {/* LEFT/RIGHT TREE NAVIGATION PANE (col-span-3)            */}
+        {/* ------------------------------------------------------- */}
+        <div className="lg:col-span-3 space-y-3">
+          {/* Quick Access List */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-1">
+            <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block mb-2 px-1">
+              دسترسی سریع
+            </span>
+
+            <button
+              onClick={() => {
+                setQuickFilter('all');
+                setCurrentFolderId(null);
+              }}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                quickFilter === 'all' && currentFolderId === null
+                  ? 'bg-sky-600 text-white shadow-xs'
+                  : 'hover:bg-slate-100 text-slate-700'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <HardDrive className="w-4 h-4" />
+                <span>همه اسناد و پوشه‌ها</span>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${quickFilter === 'all' && currentFolderId === null ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {files.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setQuickFilter('starred')}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                quickFilter === 'starred'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'hover:bg-amber-50 text-slate-700'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                <span>اسناد مهم و ستاره‌دار</span>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${quickFilter === 'starred' ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700'}`}>
+                {files.filter((f) => f.isStarred).length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setQuickFilter('locked')}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                quickFilter === 'locked'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'hover:bg-rose-50 text-slate-700'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-rose-500" />
+                <span>اسناد رمزدار و محرمانه</span>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${quickFilter === 'locked' ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-700'}`}>
+                {totalLockedCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setQuickFilter('auto_synced')}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                quickFilter === 'auto_synced'
+                  ? 'bg-sky-600 text-white shadow-xs'
+                  : 'hover:bg-sky-50 text-slate-700'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-sky-500" />
+                <span>اسناد خودکار بیمارستان</span>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${quickFilter === 'auto_synced' ? 'bg-white/20 text-white' : 'bg-sky-50 text-sky-700'}`}>
+                {files.filter((f) => f.isAutoGenerated).length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setQuickFilter('my_uploads')}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer ${
+                quickFilter === 'my_uploads'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'hover:bg-indigo-50 text-slate-700'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-indigo-500" />
+                <span>بارگذاری‌های من</span>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${quickFilter === 'my_uploads' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700'}`}>
+                {files.filter((f) => !f.isAutoGenerated || f.uploadedByName === currentUser?.name).length}
+              </span>
+            </button>
+          </div>
+
+          {/* System Directory Categories Tree */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between px-1 mb-1">
+              <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                شاخه‌های اصلی اسناد (C:)
+              </span>
+              <FolderTree className="w-3.5 h-3.5 text-slate-400" />
+            </div>
+
+            <div className="space-y-1">
+              {folders
+                .filter((f) => f.parentId === null)
+                .map((rootFolder) => {
+                  const isCurrent = currentFolderId === rootFolder.id;
+                  const childCount = files.filter((f) => f.folderId === rootFolder.id).length;
+                  const subfoldersCount = folders.filter((fld) => fld.parentId === rootFolder.id).length;
+
+                  return (
+                    <button
+                      key={rootFolder.id}
+                      onClick={() => {
+                        setQuickFilter('all');
+                        handleOpenItem(rootFolder, 'folder');
+                      }}
+                      className={`w-full text-right p-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border ${
+                        isCurrent
+                          ? 'bg-sky-50 border-sky-300 text-sky-950 shadow-2xs font-black'
+                          : 'bg-white border-transparent hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {rootFolder.isLocked ? (
+                          <Lock className="w-4 h-4 text-rose-500 shrink-0" />
+                        ) : isCurrent ? (
+                          <FolderOpen className="w-4 h-4 text-sky-600 shrink-0" />
+                        ) : (
+                          <Folder className="w-4 h-4 text-sky-500 shrink-0" />
+                        )}
+                        <span className="truncate text-[11px]">{rootFolder.name}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md shrink-0">
+                        {childCount + subfoldersCount}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+
+        {/* ------------------------------------------------------- */}
+        {/* CENTER CONTENT EXPLORER (col-span-9)                    */}
+        {/* ------------------------------------------------------- */}
+        <div className="lg:col-span-9 space-y-3">
+          
+          {/* Windows Address Bar & Breadcrumb Navigation */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-3 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              {/* Back / Forward / Up Buttons */}
+              <div className="flex items-center gap-0.5 bg-slate-100 p-1 rounded-xl shrink-0">
+                <button
+                  onClick={handleGoBack}
+                  disabled={historyIndex <= 0}
+                  className="p-1 rounded-lg hover:bg-white disabled:opacity-30 text-slate-700 transition-colors cursor-pointer"
+                  title="بازگشت به پوشه قبلی"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleGoForward}
+                  disabled={historyIndex >= folderHistory.length - 1}
+                  className="p-1 rounded-lg hover:bg-white disabled:opacity-30 text-slate-700 transition-colors cursor-pointer"
+                  title="جلو رفتن"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleGoUp}
+                  disabled={!currentFolder}
+                  className="p-1 rounded-lg hover:bg-white disabled:opacity-30 text-slate-700 transition-colors cursor-pointer"
+                  title="یک پوشه بالاتر"
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Breadcrumb Path Bar */}
+              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 flex items-center gap-1 overflow-x-auto text-xs font-bold text-slate-700 min-w-0">
+                {breadcrumbs.map((b, idx) => (
+                  <React.Fragment key={idx}>
+                    {idx > 0 && <span className="text-slate-300 text-[10px]">❮</span>}
+                    <button
+                      onClick={() => navigateToFolder(b.id)}
+                      className={`hover:text-sky-600 truncate whitespace-nowrap cursor-pointer ${
+                        idx === breadcrumbs.length - 1 ? 'font-black text-slate-900' : 'text-slate-500'
+                      }`}
+                    >
+                      {b.name}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full md:w-56 shrink-0">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="جستجو در فایل‌ها..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs text-slate-800"
+              />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            </div>
+
+            {/* View Mode Toggle & Sort */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-lg border cursor-pointer transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-sky-50 border-sky-300 text-sky-700'
+                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
+                title="نمایش شبکه‌ای (آیکون‌ها)"
+              >
+                <Grid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('details_list')}
+                className={`p-1.5 rounded-lg border cursor-pointer transition-colors ${
+                  viewMode === 'details_list'
+                    ? 'bg-sky-50 border-sky-300 text-sky-700'
+                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
+                title="نمایش جدولی با جزئیات"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Folder & File Items Area */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs min-h-[420px]">
+            {/* Header info in folder */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-slate-800">
+                  {currentFolder ? currentFolder.name : 'شاخه اصلی حافظه اسناد (C:)'}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  ({visibleFolders.length} پوشه، {visibleFiles.length} فایل)
+                </span>
+              </div>
+
+              {/* Sort Selector */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-slate-400">مرتب‌سازی:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortField)}
+                  className="text-xs bg-slate-50 border border-slate-200 rounded-lg p-1 text-slate-700 font-bold focus:outline-none"
+                >
+                  <option value="date">تاریخ بارگذاری</option>
+                  <option value="name">نام سند</option>
+                  <option value="size">حجم فایل</option>
+                  <option value="category">دسته‌بندی</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="p-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 cursor-pointer"
+                  title={sortOrder === 'asc' ? 'صعودی' : 'نزولی'}
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </button>
+              </div>
+            </div>
+
+            {/* Empty State */}
+            {visibleFolders.length === 0 && visibleFiles.length === 0 && (
+              <div className="py-16 text-center space-y-3">
+                <div className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto shadow-inner">
+                  <FolderOpen className="w-8 h-8" />
+                </div>
+                <h3 className="text-sm font-black text-slate-700">این پوشه در حال حاضر خالی است</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  می‌توانید با دکمه‌های بالا در این پوشه فایل بارگذاری کنید یا پوشه جدید بسازید.
+                </p>
+                <div className="flex justify-center gap-2 pt-2">
+                  <button
+                    onClick={() => setIsUploadModalOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-sky-600 text-white text-xs font-bold hover:bg-sky-700 cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    <span>بارگذاری فایل در این پوشه</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* FOLDERS SECTION */}
+            {visibleFolders.length > 0 && (
+              <div className="space-y-2 mb-6">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block">
+                  پوشه‌ها ({visibleFolders.length})
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {visibleFolders.map((fld) => {
+                    const childCount = files.filter((f) => f.folderId === fld.id).length;
+
+                    return (
+                      <div
+                        key={fld.id}
+                        onClick={() => handleOpenItem(fld, 'folder')}
+                        className="relative p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 hover:bg-sky-50/60 hover:border-sky-300 hover:shadow-sm transition-all duration-150 cursor-pointer flex items-center justify-between gap-2.5 group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-sky-500 group-hover:text-white transition-colors">
+                            {fld.isLocked ? (
+                              <Lock className="w-4 h-4 text-rose-600 group-hover:text-white" />
+                            ) : (
+                              <Folder className="w-5 h-5 fill-sky-200 group-hover:fill-sky-300" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-black text-slate-900 group-hover:text-sky-950 truncate block">
+                                {fld.name}
+                              </span>
+                              {fld.isLocked && (
+                                <span className="text-[9px] px-1.5 py-0.2 bg-rose-100 text-rose-700 font-bold rounded-md">
+                                  رمزدار
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-slate-500 font-medium">
+                              {childCount} سند و فایل
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Delete Folder Button (if not system root) */}
+                        {!fld.isSystemRoot && (
+                          <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => handleDeleteFolder(fld.id, e)}
+                              className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shadow-2xs cursor-pointer"
+                              title="حذف پوشه"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* HOVER TOOLTIP CARD: Details about creator, creation date, etc. */}
+                        <div className="opacity-0 invisible group-hover:opacity-100 group-hover:visible translate-y-1 group-hover:translate-y-0 transition-all duration-200 pointer-events-none z-30 absolute bottom-full right-4 mb-2 w-72 bg-slate-900/95 backdrop-blur-md text-white rounded-2xl p-3.5 shadow-xl border border-slate-700/80 text-right space-y-2">
+                          {/* Tooltip Header */}
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Folder className="w-3.5 h-3.5 text-sky-400 fill-sky-400/20 shrink-0" />
+                              <span className="font-black text-xs text-slate-100 truncate">{fld.name}</span>
+                            </div>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${fld.isLocked ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                              {fld.isLocked ? 'محافظت با رمز عبور' : 'دسترسی عمومی'}
+                            </span>
+                          </div>
+
+                          {/* Tooltip Info Grid */}
+                          <div className="space-y-1.5 text-[11px]">
+                            <div className="flex items-center justify-between text-slate-300">
+                              <span className="text-slate-400 flex items-center gap-1">
+                                <UserCheck className="w-3 h-3 text-sky-400" />
+                                <span>ایجادکننده:</span>
+                              </span>
+                              <span className="font-bold text-white">{fld.createdByName}</span>
+                            </div>
+
+                            {fld.createdByRoleFa && (
+                              <div className="flex items-center justify-between text-slate-300">
+                                <span className="text-slate-400 flex items-center gap-1">
+                                  <Shield className="w-3 h-3 text-sky-400" />
+                                  <span>سمت / نقش:</span>
+                                </span>
+                                <span className="font-medium text-slate-200">{fld.createdByRoleFa}</span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-slate-300">
+                              <span className="text-slate-400 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-sky-400" />
+                                <span>تاریخ ایجاد:</span>
+                              </span>
+                              <span className="font-bold text-white">{fld.createdDate}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-slate-300">
+                              <span className="text-slate-400 flex items-center gap-1">
+                                <FileText className="w-3 h-3 text-sky-400" />
+                                <span>تعداد اسناد:</span>
+                              </span>
+                              <span className="font-bold text-sky-300">{childCount} فایل</span>
+                            </div>
+
+                            {fld.description && (
+                              <div className="pt-1.5 border-t border-slate-800 text-[10px] text-slate-300 leading-relaxed">
+                                {fld.description}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Tooltip Footer Click Hint */}
+                          <div className="pt-1.5 border-t border-slate-800 text-[10px] text-sky-300 flex items-center justify-center gap-1 font-bold">
+                            <FolderOpen className="w-3 h-3" />
+                            <span>جهت ورود به این پوشه کلیک کنید</span>
+                          </div>
+
+                          {/* Arrow pointer */}
+                          <div className="absolute top-full right-8 -mt-1 border-4 border-transparent border-t-slate-900/95" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* FILES SECTION - GRID VIEW */}
+            {visibleFiles.length > 0 && viewMode === 'grid' && (
+              <div className="space-y-2">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block">
+                  اسناد و فایل‌ها ({visibleFiles.length})
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
+                  {visibleFiles.map((file) => {
+                    const catBadge = getCategoryBadge(file.category);
+
+                    return (
+                      <div
+                        key={file.id}
+                        onClick={() => handleOpenItem(file, 'file')}
+                        className="p-3.5 rounded-2xl border border-slate-200 bg-white hover:border-sky-300 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between gap-3 group relative"
+                      >
+                        {/* Top Meta Bar */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="shrink-0 p-1.5 bg-slate-50 rounded-xl border border-slate-100">
+                              {renderFileIcon(file.extension)}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-black text-slate-900 group-hover:text-sky-900 line-clamp-2 leading-snug">
+                                {file.title}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono dir-ltr block truncate">
+                                {file.originalFileName}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={(e) => handleToggleStar(file.id, e)}
+                            className="p-1 rounded-lg text-slate-300 hover:text-amber-400 transition-colors shrink-0"
+                            title={file.isStarred ? 'حذف از نشان‌شده‌ها' : 'نشان کردن سند'}
+                          >
+                            <Star
+                              className={`w-4 h-4 ${file.isStarred ? 'text-amber-400 fill-amber-400' : ''}`}
+                            />
+                          </button>
+                        </div>
+
+                        {/* Category and Equipment Badges */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                          <span className={`px-2 py-0.5 rounded-md border font-bold ${catBadge.bg}`}>
+                            {catBadge.label}
+                          </span>
+
+                          {file.isLocked && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold border border-rose-200 flex items-center gap-1">
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>رمزدار</span>
+                            </span>
+                          )}
+
+                          {file.isAutoGenerated && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                              سیستمی خودکار
+                            </span>
+                          )}
+
+                          {file.equipmentCode && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold font-mono">
+                              {file.equipmentCode}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bottom Info Bar & Action Triggers */}
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                          <span>{file.fileSizeFormatted} | {file.uploadDate}</span>
+
+                          <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenItem(file, 'file');
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-sky-600 hover:text-white text-slate-700 transition-colors cursor-pointer"
+                              title="پیش‌نمایش سند"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSetPasswordTarget(file);
+                                setNewPasswordInput(file.password || '');
+                                setNewPasswordHintInput(file.passwordHint || '');
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-700 transition-colors cursor-pointer"
+                              title="تنظیم / حذف رمز عبور"
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteFile(file.id, e)}
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 hover:text-rose-700 text-slate-400 transition-colors cursor-pointer"
+                              title="حذف سند"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* FILES SECTION - DETAILS LIST VIEW */}
+            {visibleFiles.length > 0 && viewMode === 'details_list' && (
+              <div className="space-y-2 overflow-x-auto">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider block mb-2">
+                  اسناد و فایل‌ها ({visibleFiles.length})
+                </span>
+
+                <table className="w-full text-right text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 text-[11px] font-bold">
+                      <th className="pb-2 pr-2">عنوان و نام فایل</th>
+                      <th className="pb-2">دسته‌بندی</th>
+                      <th className="pb-2">دستگاه / کد</th>
+                      <th className="pb-2">حجم</th>
+                      <th className="pb-2">تاریخ</th>
+                      <th className="pb-2">بارگذارنده</th>
+                      <th className="pb-2">امنیت</th>
+                      <th className="pb-2 text-center">عملیات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {visibleFiles.map((file) => {
+                      const catBadge = getCategoryBadge(file.category);
+
+                      return (
+                        <tr
+                          key={file.id}
+                          onClick={() => handleOpenItem(file, 'file')}
+                          className="hover:bg-slate-50 cursor-pointer transition-colors text-slate-700"
+                        >
+                          <td className="py-2.5 pr-2">
+                            <div className="flex items-center gap-2">
+                              {renderFileIcon(file.extension, 'w-5 h-5')}
+                              <div>
+                                <span className="font-bold text-slate-900 block">{file.title}</span>
+                                <span className="text-[10px] text-slate-400 font-mono dir-ltr block">
+                                  {file.originalFileName}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-2.5">
+                            <span className={`px-2 py-0.5 rounded text-[10px] border font-bold ${catBadge.bg}`}>
+                              {catBadge.label}
+                            </span>
+                          </td>
+                          <td className="py-2.5">
+                            {file.equipmentCode ? (
+                              <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700">
+                                {file.equipmentCode}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 text-[11px] font-mono text-slate-500">
+                            {file.fileSizeFormatted}
+                          </td>
+                          <td className="py-2.5 text-[11px] text-slate-500">{file.uploadDate}</td>
+                          <td className="py-2.5 text-[11px] text-slate-600">{file.uploadedByName}</td>
+                          <td className="py-2.5">
+                            {file.isLocked ? (
+                              <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold flex items-center gap-1 w-fit">
+                                <Lock className="w-2.5 h-2.5" />
+                                رمزدار
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">عمومی</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenItem(file, 'file');
+                                }}
+                                className="p-1 rounded hover:bg-sky-100 text-sky-700"
+                                title="مشاهده"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => handleToggleStar(file.id, e)}
+                                className="p-1 rounded hover:bg-amber-50 text-slate-400 hover:text-amber-400"
+                                title="نشان‌دار"
+                              >
+                                <Star
+                                  className={`w-3.5 h-3.5 ${file.isStarred ? 'text-amber-400 fill-amber-400' : ''}`}
+                                />
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteFile(file.id, e)}
+                                className="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-600"
+                                title="حذف"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 3. MODAL: CREATE NEW FOLDER                               */}
+      {/* ========================================================= */}
+      {isNewFolderModalOpen && (
+        <CreateFolderModal
+          isOpen={isNewFolderModalOpen}
+          onClose={() => setIsNewFolderModalOpen(false)}
+          currentFolderId={currentFolderId}
+          folders={folders}
+          currentUser={currentUser}
+          onCreateFolder={(newFolder) => {
+            setFolders((prev) => [...prev, newFolder]);
+            setIsNewFolderModalOpen(false);
+            showToast(`پوشه جدید «${newFolder.name}» با موفقیت ایجاد گردید.`);
+          }}
+        />
+      )}
+
+      {/* ========================================================= */}
+      {/* 4. MODAL: UPLOAD FILE / DOCUMENT                          */}
+      {/* ========================================================= */}
+      {isUploadModalOpen && (
+        <UploadFileModal
+          isOpen={isUploadModalOpen}
+          onClose={() => setIsUploadModalOpen(false)}
+          currentFolderId={currentFolderId}
+          folders={folders}
+          equipmentList={equipmentList}
+          currentUser={currentUser}
+          onUploadFile={(newFile) => {
+            setFiles((prev) => [newFile, ...prev]);
+            setIsUploadModalOpen(false);
+            showToast(`سند «${newFile.title}» با موفقیت در کتابخانه اسناد بارگذاری شد.`);
+          }}
+        />
+      )}
+
+      {/* ========================================================= */}
+      {/* 5. MODAL: PASSWORD UNLOCK PROMPT                          */}
+      {/* ========================================================= */}
+      {lockedTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-rose-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 text-right">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center font-black">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">
+                    این {lockedTarget.type === 'folder' ? 'پوشه' : 'سند'} دارای رمز عبور است
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    برای دسترسی و مشاهده محتوا، رمز عبور را وارد فرمایید
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setLockedTarget(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-rose-50/60 rounded-2xl border border-rose-100 text-xs">
+              <span className="font-bold text-slate-800 block">
+                {lockedTarget.type === 'folder'
+                  ? (lockedTarget.item as HospitalDocumentFolder).name
+                  : (lockedTarget.item as HospitalDocumentFile).title}
+              </span>
+              {'passwordHint' in lockedTarget.item && lockedTarget.item.passwordHint && (
+                <span className="text-[11px] text-rose-700 block mt-1">
+                  راهنمای رمز: {lockedTarget.item.passwordHint}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">رمز عبور امنیتی:</label>
+              <input
+                type="password"
+                value={enteredPassword}
+                onChange={(e) => {
+                  setEnteredPassword(e.target.value);
+                  setPasswordError(null);
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && handleVerifyPassword()}
+                placeholder="رمز عبور را تایپ فرمایید..."
+                autoFocus
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-rose-500 focus:bg-white text-xs font-bold"
+              />
+              {passwordError && (
+                <span className="text-[11px] text-rose-600 font-bold block">{passwordError}</span>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setLockedTarget(null)}
+                className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                onClick={handleVerifyPassword}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Unlock className="w-4 h-4" />
+                <span>گشودن و ورود</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 6. MODAL: SET / REMOVE PASSWORD                           */}
+      {/* ========================================================= */}
+      {setPasswordTarget && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 text-right">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center font-black">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">
+                    تنظیم رمز عبور و قفل امنیتی سند
+                  </h3>
+                  <p className="text-[10px] text-slate-400">
+                    جهت محرمانه نگه‌داشتن و جلوگیری از دسترسی غیرمجاز
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSetPasswordTarget(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
+              <span className="text-slate-500 block">سند انتخابی:</span>
+              <span className="font-black text-slate-800 block mt-0.5">{setPasswordTarget.title}</span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  رمز عبور جدید (برای حذف رمز، فیلد را خالی بگذارید):
+                </label>
+                <input
+                  type="text"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  placeholder="مثال: 1403@Hospital"
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">راهنمای یادآوری رمز (اختیاری):</label>
+                <input
+                  type="text"
+                  value={newPasswordHintInput}
+                  onChange={(e) => setNewPasswordHintInput(e.target.value)}
+                  placeholder="مثال: شماره پرسنلی سرپرست"
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSetPasswordTarget(null)}
+                className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 cursor-pointer"
+              >
+                انصراف
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveFilePassword}
+                className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>ذخیره تنظیمات رمز</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 7. MODAL: FULL DOCUMENT PREVIEW VIEWER                    */}
+      {/* ========================================================= */}
+      {previewFile && (
+        <DocumentPreviewModal
+          file={previewFile}
+          onClose={() => setPreviewFile(null)}
+          onDownload={() => showToast(`فایل «${previewFile.title}» با موفقیت دانلود شد.`)}
+          onToggleStar={() => handleToggleStar(previewFile.id)}
+        />
+      )}
+
+      {/* ========================================================= */}
+      {/* TOAST NOTIFICATION                                        */}
+      {/* ========================================================= */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// =========================================================================
+// SUB-MODAL 1: CREATE FOLDER MODAL
+// =========================================================================
+interface CreateFolderModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentFolderId: string | null;
+  folders: HospitalDocumentFolder[];
+  currentUser?: AppUser;
+  onCreateFolder: (folder: HospitalDocumentFolder) => void;
+}
+
+const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
+  onClose,
+  currentFolderId,
+  folders,
+  currentUser,
+  onCreateFolder,
+}) => {
+  const [name, setName] = useState('');
+  const [parentId, setParentId] = useState<string | null>(currentFolderId);
+  const [category, setCategory] = useState<HospitalDocCategory>('user_custom');
+  const [description, setDescription] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    const newFolder: HospitalDocumentFolder = {
+      id: `fld-cust-${Date.now()}`,
+      name: name.trim(),
+      parentId: parentId || null,
+      category,
+      description: description.trim() || undefined,
+      isLocked,
+      password: isLocked ? password.trim() : undefined,
+      createdDate: new Intl.DateTimeFormat('fa-IR').format(new Date()),
+      createdByName: currentUser?.name || 'کاربر سیستم',
+      createdByRoleFa: currentUser?.roleFa || 'کارشناس بیمارستان',
+      department: currentUser?.department || 'عمومی',
+      color: '#3b82f6',
+    };
+
+    onCreateFolder(newFolder);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 text-right dir-rtl">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center font-black">
+              <FolderPlus className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800">ایجاد پوشه جدید در حافظه ویندوزی</h3>
+              <p className="text-[10px] text-slate-400">پوشه‌بندی و دسته‌بندی اسناد بیمارستانی</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <label className="font-bold text-slate-800 block mb-1">
+              نام پوشه: <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="مثال: قراردادهای گارانتی دستگاه‌های بیهوشی"
+              className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs font-bold"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">مسیر والد (Parent Folder):</label>
+              <select
+                value={parentId || ''}
+                onChange={(e) => setParentId(e.target.value ? e.target.value : null)}
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs font-bold"
+              >
+                <option value="">📁 ریشه درایو C: (صفحه اصلی)</option>
+                {folders.map((fld) => (
+                  <option key={fld.id} value={fld.id}>
+                    📁 {fld.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">دسته‌بندی موضوعی:</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as HospitalDocCategory)}
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs font-bold"
+              >
+                <option value="user_custom">اسناد عمومی و سفارشی</option>
+                <option value="calibration">گواهی‌های کالیبراسیون</option>
+                <option value="repairs">سوابق تعمیرات و نگهداری PM</option>
+                <option value="failures">گزارش‌های خرابی</option>
+                <option value="equipment_manuals">شناسنامه‌ها و کاتالوگ‌ها</option>
+                <option value="purchase_invoices">اسناد مالی و فاکتورها</option>
+                <option value="clinical_guidelines">پروتکل‌های بالینی و ایمنی</option>
+                <option value="periodic_reports">گزارش‌های دوره‌ای</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="font-bold text-slate-800 block mb-1">توضیحات اختیاری پوشه:</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="مثال: اسناد مربوط به بخش مراقبت‌های ویژه ICU جنرال"
+              className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs"
+            />
+          </div>
+
+          {/* Password Protection */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-slate-800 flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isLocked}
+                  onChange={(e) => setIsLocked(e.target.checked)}
+                  className="rounded text-sky-600 focus:ring-sky-500 w-4 h-4 cursor-pointer"
+                />
+                <Lock className="w-3.5 h-3.5 text-rose-500" />
+                <span>قفل‌گذاری امنیتی و ایجاد رمز عبور برای این پوشه</span>
+              </label>
+            </div>
+
+            {isLocked && (
+              <div className="pt-2 space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-700">رمز عبور پوشه:</label>
+                <input
+                  type="text"
+                  required={isLocked}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="رمز عبور دلخواه را وارد فرمایید..."
+                  className="w-full p-2 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-rose-500 text-xs font-bold"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 cursor-pointer"
+            >
+              انصراف
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+            >
+              <FolderPlus className="w-4 h-4" />
+              <span>ایجاد پوشه</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// =========================================================================
+// SUB-MODAL 2: UPLOAD FILE MODAL
+// =========================================================================
+interface UploadFileModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentFolderId: string | null;
+  folders: HospitalDocumentFolder[];
+  equipmentList: EquipmentItem[];
+  currentUser?: AppUser;
+  onUploadFile: (file: HospitalDocumentFile) => void;
+}
+
+const UploadFileModal: React.FC<UploadFileModalProps> = ({
+  onClose,
+  currentFolderId,
+  folders,
+  equipmentList,
+  currentUser,
+  onUploadFile,
+}) => {
+  const [title, setTitle] = useState('');
+  const [selectedFolderId, setSelectedFolderId] = useState<string>(currentFolderId || 'fld-root-custom');
+  const [category, setCategory] = useState<HospitalDocCategory>('user_custom');
+  const [extension, setExtension] = useState<HospitalDocExtension>('pdf');
+  const [fileName, setFileName] = useState('');
+  const [selectedEquipmentCode, setSelectedEquipmentCode] = useState('');
+  const [department, setDepartment] = useState(currentUser?.department || '');
+  const [description, setDescription] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordHint, setPasswordHint] = useState('');
+
+  const handleSimulateFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setFileName(file.name);
+      if (!title) {
+        setTitle(file.name.replace(/\.[^/.]+$/, ''));
+      }
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (ext === 'pdf') setExtension('pdf');
+      else if (ext === 'xlsx' || ext === 'xls') setExtension('xlsx');
+      else if (ext === 'docx' || ext === 'doc') setExtension('docx');
+      else if (ext === 'jpg' || ext === 'png' || ext === 'jpeg') setExtension('jpg');
+      else if (ext === 'zip' || ext === 'rar') setExtension('zip');
+      else if (ext === 'dcm' || ext === 'dicom') setExtension('dicom');
+      else setExtension('other');
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    const matchedEq = equipmentList.find((eq) => eq.code === selectedEquipmentCode);
+    const sizeBytes = 1500000 + Math.floor(Math.random() * 3000000);
+    const sizeFormatted = (sizeBytes / (1024 * 1024)).toFixed(2) + ' مگابایت';
+
+    const tags = tagsInput
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+    const newFile: HospitalDocumentFile = {
+      id: `doc-user-${Date.now()}`,
+      folderId: selectedFolderId,
+      title: title.trim(),
+      originalFileName: fileName || `${title.replace(/\s+/g, '_')}.${extension}`,
+      extension,
+      fileSizeBytes: sizeBytes,
+      fileSizeFormatted: sizeFormatted,
+      category,
+      isAutoGenerated: false,
+      equipmentCode: selectedEquipmentCode || undefined,
+      equipmentName: matchedEq?.name || undefined,
+      department: department || currentUser?.department || 'بیمارستان',
+      uploadDate: new Intl.DateTimeFormat('fa-IR').format(new Date()),
+      uploadedByName: currentUser?.name || 'کاربر سیستم',
+      uploadedByRoleFa: currentUser?.roleFa || 'کارشناس بیمارستان',
+      description: description.trim() || undefined,
+      tags: tags.length > 0 ? tags : ['اسناد بیمارستانی', department || 'عمومی'],
+      isLocked,
+      password: isLocked ? password.trim() : undefined,
+      passwordHint: isLocked ? passwordHint.trim() || undefined : undefined,
+      isConfidential: isLocked,
+      version: '1.0',
+    };
+
+    onUploadFile(newFile);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 text-right dir-rtl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center font-black">
+              <UploadCloud className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800">بارگذاری سند بیمارستانی در حافظه ویندوزی</h3>
+              <p className="text-[10px] text-slate-400">
+                گواهی‌ها، سوابق تعمیرات، اسکن مدارک، قراردادها و مستندات فنی
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          {/* Simulated Drag & Drop Zone */}
+          <div className="border-2 border-dashed border-sky-300 rounded-2xl p-4 bg-sky-50/50 hover:bg-sky-50 transition-colors text-center cursor-pointer relative">
+            <input
+              type="file"
+              onChange={handleSimulateFileSelect}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+            />
+            <div className="space-y-1.5 pointer-events-none">
+              <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center mx-auto">
+                <UploadCloud className="w-5 h-5" />
+              </div>
+              <p className="text-xs font-black text-sky-950">
+                {fileName ? `فایل انتخاب‌شده: ${fileName}` : 'فایل را اینجا بکشید یا برای انتخاب کلیک کنید'}
+              </p>
+              <p className="text-[10px] text-slate-400">
+                پشتیبانی از فرمت‌های PDF، Word، Excel، تصاویر، فایل‌های فشرده و اسکن پزشکی DICOM
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="font-bold text-slate-800 block mb-1">
+              عنوان رسمی سند: <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="مثال: گواهی کالیبراسیون و آزمون ایمنی ونتیلاتور دراگر"
+              className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs font-bold"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">پوشه ذخیره‌سازی مقصد:</label>
+              <select
+                value={selectedFolderId}
+                onChange={(e) => setSelectedFolderId(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs font-bold"
+              >
+                {folders.map((fld) => (
+                  <option key={fld.id} value={fld.id}>
+                    📁 {fld.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">دسته‌بندی موضوعی:</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as HospitalDocCategory)}
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs font-bold"
+              >
+                <option value="user_custom">اسناد عمومی و متفرقه</option>
+                <option value="calibration">گواهی کالیبراسیون و ایمنی</option>
+                <option value="repairs">سوابق تعمیرات و نگهداری PM</option>
+                <option value="failures">گزارش خرابی و عیب‌یابی</option>
+                <option value="equipment_manuals">شناسنامه و کاتالوگ دستگاه</option>
+                <option value="purchase_invoices">پیش‌فاکتور و اسناد مالی</option>
+                <option value="clinical_guidelines">پروتکل بالینی و ایمنی</option>
+                <option value="periodic_reports">گزارش‌های دوره‌ای و آماری</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">اتصال به دستگاه پزشکی (اختیاری):</label>
+              <select
+                value={selectedEquipmentCode}
+                onChange={(e) => setSelectedEquipmentCode(e.target.value)}
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs font-bold"
+              >
+                <option value="">-- بدون اتصال مستقیم به تجهیز --</option>
+                {equipmentList.map((eq) => (
+                  <option key={eq.id} value={eq.code}>
+                    {eq.name} ({eq.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">بخش / دپارتمان مربوطه:</label>
+              <input
+                type="text"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="مثال: اورژانس، ICU، مهندسی پزشکی..."
+                className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="font-bold text-slate-800 block mb-1">برچسب‌ها / تگ‌ها (با کاما جدا کنید):</label>
+            <input
+              type="text"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="مثال: کالیبراسیون, ونتیلاتور, اورژانس, تاییدیه ۱۴۰۳"
+              className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="font-bold text-slate-800 block mb-1">توضیحات و یادداشت سند:</label>
+            <textarea
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="شرح جزئیات، شماره تاییدیه، اقدامات انجام‌شده یا نتایج تست..."
+              className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:border-sky-500 focus:bg-white text-xs resize-none"
+            />
+          </div>
+
+          {/* Password Protection for Upload */}
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-slate-800 flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isLocked}
+                  onChange={(e) => setIsLocked(e.target.checked)}
+                  className="rounded text-sky-600 focus:ring-sky-500 w-4 h-4 cursor-pointer"
+                />
+                <Lock className="w-3.5 h-3.5 text-rose-500" />
+                <span>رمزگذاری و قفل امنیتی روی این سند (محرمانه)</span>
+              </label>
+            </div>
+
+            {isLocked && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">رمز عبور:</label>
+                  <input
+                    type="text"
+                    required={isLocked}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="رمز دلخواه..."
+                    className="w-full p-2 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-rose-500 text-xs font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">راهنمای رمز (اختیاری):</label>
+                  <input
+                    type="text"
+                    value={passwordHint}
+                    onChange={(e) => setPasswordHint(e.target.value)}
+                    placeholder="مثال: سال تاسیس بیمارستان"
+                    className="w-full p-2 rounded-xl bg-white border border-slate-200 focus:outline-none focus:border-rose-500 text-xs"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 cursor-pointer"
+            >
+              انصراف
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>بارگذاری و ثبت سند</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// =========================================================================
+// SUB-MODAL 3: FULL DOCUMENT PREVIEW VIEWER
+// =========================================================================
+interface DocumentPreviewModalProps {
+  file: HospitalDocumentFile;
+  onClose: () => void;
+  onDownload: () => void;
+  onToggleStar: () => void;
+}
+
+const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
+  file,
+  onClose,
+  onDownload,
+  onToggleStar,
+}) => {
+  return (
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl max-w-4xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-150 text-right dir-rtl">
+        {/* Preview Top Header Toolbar */}
+        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 bg-slate-800 rounded-xl">
+              <FileText className="w-5 h-5 text-sky-400" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-white truncate">{file.title}</h2>
+              <span className="text-[11px] text-slate-400 font-mono dir-ltr block truncate">
+                {file.originalFileName} | {file.fileSizeFormatted}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onToggleStar}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 transition-colors cursor-pointer"
+              title="نشان کردن"
+            >
+              <Star className={`w-4 h-4 ${file.isStarred ? 'text-amber-400 fill-amber-400' : ''}`} />
+            </button>
+
+            <button
+              onClick={onDownload}
+              className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>دریافت فایل</span>
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer"
+              title="چاپ سند"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Preview Body Canvas */}
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-100 flex flex-col items-center">
+          {/* Simulated High-Fidelity Hospital Paper Sheet */}
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-300/80 max-w-2xl w-full p-8 space-y-6 text-right">
+            {/* Hospital Official Header */}
+            <div className="border-b-2 border-slate-800 pb-4 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-black text-sky-800 block">
+                  سامانه مدیریت یکپارچه تجهیزات پزشکی و اسناد بالینی
+                </span>
+                <h1 className="text-base font-black text-slate-900 mt-1">{file.title}</h1>
+                <span className="text-[11px] text-slate-500">
+                  شناسه مدرک در سیستم: <span className="font-mono font-bold">{file.id}</span>
+                </span>
+              </div>
+              <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-200 text-sky-700 flex flex-col items-center justify-center font-black text-[10px] text-center p-1">
+                <span>تاییدیه</span>
+                <span className="text-[9px] font-mono font-bold text-slate-600">OFFICIAL</span>
+              </div>
+            </div>
+
+            {/* Metadata Table */}
+            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div>
+                <span className="text-slate-400 block text-[11px]">دسته‌بندی سند:</span>
+                <span className="font-black text-slate-800">{file.category}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">تاریخ بارگذاری و ثبت:</span>
+                <span className="font-bold text-slate-800">{file.uploadDate}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">دستگاه یا تجهیز مرتبط:</span>
+                <span className="font-bold text-sky-700">
+                  {file.equipmentName || file.equipmentCode || 'تجهیزات عمومی بیمارستان'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">واحد / دپارتمان:</span>
+                <span className="font-bold text-slate-800">{file.department || 'کلیه بخش‌ها'}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">ثبت‌کننده / کارشناس:</span>
+                <span className="font-bold text-slate-800">{file.uploadedByName}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[11px]">سطح امنیت و دسترسی:</span>
+                <span className="font-bold text-slate-800">
+                  {file.isLocked ? 'محرمانه (دارای رمز عبور)' : 'دسترسی سازمانی'}
+                </span>
+              </div>
+            </div>
+
+            {/* Content Summary / Description */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>شرح و مفاد سند / اقدامات ثبت‌شده:</span>
+              </h4>
+              <p className="text-xs text-slate-700 leading-relaxed bg-slate-50/70 p-4 rounded-xl border border-slate-200">
+                {file.description ||
+                  'این سند به‌صورت استاندارد در آرشیو کتابخانه اسناد بیمارستان به ثبت رسیده و دارای اعتبار رسمی جهت بازرسی‌ها و ارزیابی‌های اعتباربخشی ملی وزارت بهداشت می‌باشد.'}
+              </p>
+            </div>
+
+            {/* Official Signature and Verification Seal */}
+            <div className="pt-6 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
+              <div>
+                <span>امضا و مهر تایید الکترونیکی:</span>
+                <div className="mt-1 font-bold text-slate-800 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>تایید سلامت و اصالت سند توسط مهندسی پزشکی</span>
+                </div>
+              </div>
+              <div className="text-left font-mono text-[10px] text-slate-400 dir-ltr">
+                DOC-HASH: SHA256-VERIFIED
+                <br />
+                AUTOSYNC-STAMP: {file.uploadDate}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
