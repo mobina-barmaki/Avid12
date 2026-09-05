@@ -129,10 +129,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, allUsers }) => {
           {/* Middle Content */}
           <div className="my-auto space-y-4 text-right z-10 py-6">
             <h3 className="text-2xl lg:text-3xl font-black text-white leading-snug tracking-tight">
-              آوید مد<span className="text-sky-300 font-extrabold text-2xl">+</span>
+              هاسیار<span className="text-sky-300 font-extrabold text-2xl">+</span>
             </h3>
             <p className="text-xs lg:text-sm text-blue-100 leading-relaxed font-medium">
-              مدیریت یکپارچه دارایی‌ها و تجهیزات پزشکی، برنامه‌ریزی کالیبراسیون و نگهداری پیشگیرانه (PM)، کنترل انبار و تدارکات هوشمند
+              سامانه هوشمند هاسیار: مدیریت یکپارچه دارایی‌ها و تجهیزات پزشکی، برنامه‌ریزی کالیبراسیون و نگهداری پیشگیرانه (PM)، کنترل انبار و تدارکات هوشمند
             </p>
 
             {/* Checklist */}
@@ -166,7 +166,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, allUsers }) => {
                 <Building2 className="w-4 h-4" />
               </div>
               <span className="font-black text-slate-900 text-sm tracking-tight">
-                Avid MedEquip
+                Hosyar
               </span>
             </div>
 

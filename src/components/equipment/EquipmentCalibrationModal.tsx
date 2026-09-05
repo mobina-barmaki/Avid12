@@ -638,7 +638,7 @@ export const EquipmentCalibrationModal: React.FC<EquipmentCalibrationModalProps>
                 <div className="border-b-2 border-indigo-950 pb-4 flex items-center justify-between">
                   <div>
                     <h1 className="text-base font-black text-slate-900">
-                      بیمارستان تخصصی و فوق‌تخصصی آوید مدیکال
+                      بیمارستان تخصصی و فوق‌تخصصی هاسیار (Hosyar)
                     </h1>
                     <p className="text-xs text-slate-600">
                       مرکز جامع آزمون‌های کنترل کیفی و کالیبراسیون تجهیزات پزشکی

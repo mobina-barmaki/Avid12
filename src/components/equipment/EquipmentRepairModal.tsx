@@ -817,7 +817,7 @@ export const EquipmentRepairModal: React.FC<EquipmentRepairModalProps> = ({
                 <div className="border-b-2 border-slate-800 pb-4 flex items-center justify-between">
                   <div className="space-y-1">
                     <h1 className="text-base font-black text-slate-900">
-                      بیمارستان تخصصی و فوق‌تخصصی آوید مدیکال
+                      بیمارستان تخصصی و فوق‌تخصصی هاسیار (Hosyar)
                     </h1>
                     <p className="text-xs text-slate-600">
                       معاونت درمان • اداره مهندسی پزشکی و مدیریت تجهیزات و اموال

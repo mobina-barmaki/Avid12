@@ -284,7 +284,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenAIChat}
           className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-[#2b64f6] to-[#1d52d8] hover:from-[#1d52d8] hover:to-[#1e40af] text-white text-xs font-black shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 transition-all cursor-pointer border border-blue-400/30"
-          title="دستیار هوشمند AI آوید"
+          title="دستیار هوشمند AI هاسیار (Hosyar)"
         >
           <Bot className="w-4 h-4 text-sky-200" />
           <span className="hidden sm:inline">دستیار هوشمند AI</span>

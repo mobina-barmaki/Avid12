@@ -271,7 +271,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
       },
       doc: {
         id: `att-${Date.now()}`,
-        name: 'SOP_Calibration_Protocol_Avid.docx',
+        name: 'SOP_Calibration_Protocol_Hosyar.docx',
         size: '۱.۱ مگابایت',
         type: 'doc',
       },

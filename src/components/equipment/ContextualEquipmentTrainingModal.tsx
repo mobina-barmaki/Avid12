@@ -94,7 +94,7 @@ export const ContextualEquipmentTrainingModal: React.FC<ContextualEquipmentTrain
 
   const handleDownload = () => {
     const content = `=====================================================
-آموزش و راهنمای عملیاتی بیمارستان تخصصی و فوق‌تخصصی آوید
+آموزش و راهنمای عملیاتی بیمارستان تخصصی و فوق‌تخصصی هاسیار (Hosyar)
 =====================================================
 تجهیز: ${equipment.faName} (${equipment.enName})
 کد اموال: ${equipment.code}

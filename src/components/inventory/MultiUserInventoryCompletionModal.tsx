@@ -1009,7 +1009,7 @@ export const MultiUserInventoryCompletionModal: React.FC<MultiUserInventoryCompl
                   <div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-black text-slate-900">
-                        بیمارستان تخصصی آوید
+                        بیمارستان تخصصی هاسیار (Hosyar)
                       </span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono font-bold">
                         پلاک فلزی

@@ -208,7 +208,7 @@ export const EducationFileViewerModal: React.FC<EducationFileViewerModalProps> =
                   <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
                     <div className="flex items-center gap-2 text-xs text-sky-700 font-bold">
                       <BookOpen className="w-4 h-4" />
-                      <span>سامانه آموزش و توانمندسازی آوید</span>
+                      <span>سامانه آموزش و توانمندسازی هاسیار</span>
                     </div>
                     <span className="text-[11px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
                       {item.extension || '.PDF'}
@@ -392,7 +392,7 @@ export const EducationFileViewerModal: React.FC<EducationFileViewerModalProps> =
                 </div>
                 <div>
                   <h4 className="text-base font-extrabold text-slate-800">{item.name}</h4>
-                  <p className="text-xs text-slate-500">شناسنامه و اطلاعات متادیتای سند در پایگاه آموزش آوید</p>
+                  <p className="text-xs text-slate-500">شناسنامه و اطلاعات متادیتای سند در پایگاه آموزش هاسیار</p>
                 </div>
               </div>
 
@@ -469,7 +469,7 @@ export const EducationFileViewerModal: React.FC<EducationFileViewerModalProps> =
         <div className="p-4 px-6 border-t border-slate-200 bg-white flex items-center justify-between text-xs">
           <div className="text-slate-500 text-[11px] flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span>سامانه آموزش داخلی بیمارستان آوید (LMS داخلی)</span>
+            <span>سامانه آموزش داخلی بیمارستان هاسیار (Hosyar LMS)</span>
           </div>
 
           <div className="flex items-center gap-2">

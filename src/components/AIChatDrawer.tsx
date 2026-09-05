@@ -35,7 +35,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const defaultGreeting: ChatMessage = {
     id: `m-welcome-${currentUser?.id || 'guest'}`,
     sender: 'assistant',
-    text: `سلام ${userName} عزیز! من دستیار هوشمند اختصاصی آوید مد اکویپ هستم. تمام داده‌های بیمارستان (انبار، کالیبراسیون، خرابی‌ها، سفارشات) را زیر نظر دارم. چطور می‌توانم کمکتان کنم؟`,
+    text: `سلام ${userName} عزیز! من دستیار هوشمند اختصاصی هاسیار (Hosyar) هستم. تمام داده‌های بیمارستان (انبار، کالیبراسیون، خرابی‌ها، سفارشات) را زیر نظر دارم. چطور می‌توانم کمکتان کنم؟`,
     timestamp: new Date().toLocaleTimeString('fa-IR', {
       hour: '2-digit',
       minute: '2-digit',
@@ -55,7 +55,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       {
         id: `m-welcome-${currentUser?.id || 'guest'}-${Date.now()}`,
         sender: 'assistant',
-        text: `سلام ${userName} عزیز! من دستیار هوشمند اختصاصی آوید مد اکویپ هستم. تمام داده‌های بیمارستان (انبار، کالیبراسیون، خرابی‌ها، سفارشات) را زیر نظر دارم. چطور می‌توانم کمکتان کنم؟`,
+        text: `سلام ${userName} عزیز! من دستیار هوشمند اختصاصی هاسیار (Hosyar) هستم. تمام داده‌های بیمارستان (انبار، کالیبراسیون، خرابی‌ها، سفارشات) را زیر نظر دارم. چطور می‌توانم کمکتان کنم؟`,
         timestamp: new Date().toLocaleTimeString('fa-IR', {
           hour: '2-digit',
           minute: '2-digit',
@@ -163,7 +163,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
               <Bot className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-sm">دستیار هوشمند AI آوید</h3>
+              <h3 className="font-bold text-sm">دستیار هوشمند AI هاسیار (Hosyar)</h3>
               <p className="text-[11px] text-sky-100 flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
                 <span>متصل به پایگاه داده بیمارستان</span>
@@ -296,7 +296,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             </button>
           </form>
           <p className="text-[10px] text-slate-400 text-center mt-2">
-            دستیار AI بر اساس داده‌های تحلیلی تجهیزات بیمارستان آوید پاسخ می‌دهد.
+            دستیار AI بر اساس داده‌های تحلیلی تجهیزات بیمارستان هاسیار (Hosyar) پاسخ می‌دهد.
           </p>
         </div>
       </div>

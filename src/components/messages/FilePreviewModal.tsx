@@ -103,7 +103,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               <div>
                 <h3 className="text-sm font-extrabold text-slate-800">{file.name}</h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  سند استاندارد سازمانی با فرمت رسمی بیمارستان آوید. برای مطالعه کامل می‌توانید فایل را ذخیره فرمایید.
+                  سند استاندارد سازمانی با فرمت رسمی بیمارستان هاسیار (Hosyar). برای مطالعه کامل می‌توانید فایل را ذخیره فرمایید.
                 </p>
               </div>
               <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-right text-xs space-y-1.5 text-slate-600">

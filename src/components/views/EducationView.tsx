@@ -1406,7 +1406,7 @@ export const EducationView: React.FC<EducationViewProps> = ({
               </div>
 
               <div className="flex items-center gap-1 text-slate-400">
-                <span>سامانه آموزشی آوید • Avid MedEquip LMS Explorer</span>
+                <span>سامانه آموزشی هاسیار • Hosyar LMS Explorer</span>
               </div>
             </div>
           </div>

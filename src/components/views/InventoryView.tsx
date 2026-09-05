@@ -2019,7 +2019,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
           <div className="flex items-center gap-2">
             <span className="px-4 py-1.5 rounded-full bg-blue-50 text-[#2b64f6] text-xs font-extrabold border border-blue-100">
-              مدیریت هوشمند انبار آوید+
+              مدیریت هوشمند انبار هاسیار+
             </span>
           </div>
         </div>
@@ -4023,7 +4023,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-black text-slate-900 tracking-tight">
-                          بیمارستان تخصصی و فوق‌تخصصی آوید
+                          بیمارستان تخصصی و فوق‌تخصصی هاسیار (Hosyar)
                         </span>
                         <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-white font-mono font-bold">
                           پلاک فلزی اموال

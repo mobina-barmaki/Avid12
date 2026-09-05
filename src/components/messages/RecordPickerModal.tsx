@@ -509,7 +509,7 @@ export const RecordPickerModal: React.FC<RecordPickerModalProps> = ({
                     statusFa: edu.statusFa,
                     statusColor: 'purple',
                     department: edu.department,
-                    additionalInfo: 'محتوای مرجع آموزش بیمارستان آوید',
+                    additionalInfo: 'محتوای مرجع آموزش بیمارستان هاسیار (Hosyar)',
                     actionLabel: edu.actionLabel,
                     targetPage: 'education',
                     targetRecordId: edu.id,

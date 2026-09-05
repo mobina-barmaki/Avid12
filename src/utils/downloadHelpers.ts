@@ -32,7 +32,7 @@ export function downloadEducationFile(item: EducationItem) {
   if (item.type === 'pdf') {
     mimeType = 'application/pdf';
     if (!fileContent) {
-      fileContent = `%PDF-1.4\n% Avicenna Hospital LMS Document: ${item.name}\nDepartment: ${item.department || 'General'}\nAuthor: ${item.author}\nDate: ${item.updatedAt}\n\n${item.description || 'پروتکل آموزشی استاندارد بیمارستان آوید'}`;
+      fileContent = `%PDF-1.4\n% Hosyar Hospital LMS Document: ${item.name}\nDepartment: ${item.department || 'General'}\nAuthor: ${item.author}\nDate: ${item.updatedAt}\n\n${item.description || 'پروتکل آموزشی استاندارد بیمارستان هاسیار (Hosyar)'}`;
     }
   } else if (item.type === 'image') {
     mimeType = 'image/svg+xml;charset=utf-8';
@@ -40,17 +40,17 @@ export function downloadEducationFile(item: EducationItem) {
       fileContent = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
         <rect width="800" height="600" fill="#0f172a"/>
         <rect x="40" y="40" width="720" height="520" rx="24" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
-        <text x="400" y="260" fill="#38bdf8" font-size="28" font-family="sans-serif" font-weight="bold" text-anchor="middle">بیمارستان تخصصی و فوق‌تخصصی آوید</text>
+        <text x="400" y="260" fill="#38bdf8" font-size="28" font-family="sans-serif" font-weight="bold" text-anchor="middle">بیمارستان تخصصی و فوق‌تخصصی هاسیار (Hosyar)</text>
         <text x="400" y="320" fill="#ffffff" font-size="20" font-family="sans-serif" text-anchor="middle">${item.name}</text>
         <text x="400" y="370" fill="#94a3b8" font-size="14" font-family="sans-serif" text-anchor="middle">دپارتمان: ${item.department || 'مهندسی پزشکی'} | تاریخ: ${item.updatedAt}</text>
       </svg>`;
     }
   } else if (item.type === 'video' || item.type === 'audio') {
     mimeType = 'text/plain;charset=utf-8';
-    fileContent = `[Avid Hospital Educational Media Package]\nعنوان فایل: ${item.name}\nنوع رسانه: ${item.type.toUpperCase()}\nدپارتمان: ${item.department || 'آموزش و توانمندسازی'}\nمدرس/تهیه‌کننده: ${item.author} (${item.authorRole || 'کارشناس'})\nمدت زمان: ${item.duration || '۱۵ دقیقه'}\nتاریخ به‌روزرسانی: ${item.updatedAt}\n\nخلاصه مباحث آموزشی:\n${item.description || 'دستورالعمل‌های استاندارد عملیاتی و کاربری بالینی تجهیزات بیمارستانی'}\n\nمتن و مستندات پیوست:\n${item.content || 'فایل ویدیویی/صوتی استاندارد درون‌سازمانی بیمارستان'}`;
+    fileContent = `[Hosyar Hospital Educational Media Package]\nعنوان فایل: ${item.name}\nنوع رسانه: ${item.type.toUpperCase()}\nدپارتمان: ${item.department || 'آموزش و توانمندسازی'}\nمدرس/تهیه‌کننده: ${item.author} (${item.authorRole || 'کارشناس'})\nمدت زمان: ${item.duration || '۱۵ دقیقه'}\nتاریخ به‌روزرسانی: ${item.updatedAt}\n\nخلاصه مباحث آموزشی:\n${item.description || 'دستورالعمل‌های استاندارد عملیاتی و کاربری بالینی تجهیزات بیمارستانی'}\n\nمتن و مستندات پیوست:\n${item.content || 'فایل ویدیویی/صوتی استاندارد درون‌سازمانی بیمارستان'}`;
   } else {
     // Document / text / spreadsheet
-    fileContent = `سامانه آموزش و توانمندسازی کارکنان بیمارستان آوید (LMS)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nنام سند: ${item.name}\nدپارتمان: ${item.department || 'مهندسی پزشکی و ایمنی'}\nمؤلف: ${item.author} (${item.authorRole || 'کارشناس'})\nتاریخ ثبت: ${item.createdAt}\nتاریخ آخرین ویرایش: ${item.updatedAt}\n\nتوضیحات و دستورالعمل:\n${item.description || ''}\n\nمحتوای تخصصی:\n${item.content || 'این سند حاوی استانداردها و چک‌لیست‌های آموزشی معتبر بیمارستان است.'}`;
+    fileContent = `سامانه آموزش و توانمندسازی کارکنان بیمارستان هاسیار (Hosyar LMS)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nنام سند: ${item.name}\nدپارتمان: ${item.department || 'مهندسی پزشکی و ایمنی'}\nمؤلف: ${item.author} (${item.authorRole || 'کارشناس'})\nتاریخ ثبت: ${item.createdAt}\nتاریخ آخرین ویرایش: ${item.updatedAt}\n\nتوضیحات و دستورالعمل:\n${item.description || ''}\n\nمحتوای تخصصی:\n${item.content || 'این سند حاوی استانداردها و چک‌لیست‌های آموزشی معتبر بیمارستان است.'}`;
   }
 
   const blob = new Blob([fileContent], { type: mimeType });
@@ -68,7 +68,7 @@ export function downloadMessageAttachmentFile(file: MessageFileAttachment, sende
 
   if (file.type === 'pdf') {
     mimeType = 'application/pdf';
-    content = `%PDF-1.4\n% Avid Hospital Workplace Message Document: ${file.name}\nSender: ${senderName || 'Hospital User'}\nSent At: ${sentAt || 'Recorded in System'}\nSize: ${file.size}\n\nپیوست رسمی سامانه ارتباطات و مکاتبات سازمانی بیمارستان آوید`;
+    content = `%PDF-1.4\n% Hosyar Hospital Workplace Message Document: ${file.name}\nSender: ${senderName || 'Hospital User'}\nSent At: ${sentAt || 'Recorded in System'}\nSize: ${file.size}\n\nپیوست رسمی سامانه ارتباطات و مکاتبات سازمانی بیمارستان هاسیار (Hosyar)`;
   } else if (file.type === 'sheet') {
     mimeType = 'text/csv;charset=utf-8';
     content = `\uFEFFردیف,کد پیوست,عنوان سند,ارسال‌کننده,زمان ارسال,حجم\n۱,${file.id},"${file.name}","${senderName || 'کاربر سیستم'}","${sentAt || 'امروز'}","${file.size}"\n`;
@@ -83,7 +83,7 @@ export function downloadMessageAttachmentFile(file: MessageFileAttachment, sende
     </svg>`;
   } else {
     mimeType = 'text/plain;charset=utf-8';
-    content = `مکاتبات سازمانی و کارگروه‌های تخصصی بیمارستان آوید\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nنام فایل پیوست: ${file.name}\nشناسه پیوست: ${file.id}\nارسال‌کننده: ${senderName || 'نامشخص'}\nزمان ارسال: ${sentAt || 'نامشخص'}\nحجم فایل: ${file.size}\nنوع فایل: ${file.type}\n\nاین فایل به عنوان ضمیمه رسمی در مکالمات سازمانی ثبت و تأیید گردیده است.`;
+    content = `مکاتبات سازمانی و کارگروه‌های تخصصی بیمارستان هاسیار (Hosyar)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nنام فایل پیوست: ${file.name}\nشناسه پیوست: ${file.id}\nارسال‌کننده: ${senderName || 'نامشخص'}\nزمان ارسال: ${sentAt || 'نامشخص'}\nحجم فایل: ${file.size}\nنوع فایل: ${file.type}\n\nاین فایل به عنوان ضمیمه رسمی در مکالمات سازمانی ثبت و تأیید گردیده است.`;
   }
 
   const blob = new Blob([content], { type: mimeType });
@@ -175,7 +175,7 @@ export function downloadInventoryCSV(items: EquipmentItem[], customFileName?: st
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
-  const fileName = customFileName || `گزارش_جامع_موجودی_انبار_بیمارستان_آوید_${today}.csv`;
+  const fileName = customFileName || `گزارش_جامع_موجودی_انبار_بیمارستان_هاسیار_${today}.csv`;
   
   triggerFileDownload(blob, fileName);
 }

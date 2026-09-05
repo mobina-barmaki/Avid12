@@ -287,7 +287,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <div>
                 <label className="font-bold text-slate-700 block mb-1">نام مرکز درمانی:</label>
                 <input
-                  defaultValue="بیمارستان تخصصی آوید (Avid MedEquip)"
+                  defaultValue="بیمارستان تخصصی هاسیار (Hosyar)"
                   className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200"
                 />
               </div>

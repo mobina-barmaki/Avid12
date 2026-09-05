@@ -396,10 +396,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!collapsed && (
             <div className="flex flex-col text-right">
               <span className="font-black text-white text-lg leading-tight tracking-tight flex items-center gap-1">
-                آوید مد<span className="text-sky-300 font-extrabold text-sm">+</span>
+                هاسیار<span className="text-sky-300 font-extrabold text-sm">+</span>
               </span>
               <span className="text-[10px] text-sky-200 font-medium tracking-wide dir-ltr text-right">
-                Avid MedEquip
+                Hosyar
               </span>
             </div>
           )}

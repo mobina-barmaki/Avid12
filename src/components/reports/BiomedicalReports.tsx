@@ -843,7 +843,7 @@ export const BiomedicalReports: React.FC<BiomedicalReportsProps> = ({
               نمایش {toPersianNumber(filteredMonitoredItems.length)} قلم از مجموع {toPersianNumber(monitoredItemsList.length)} قلم تحت نظارت
             </span>
             <span className="text-slate-400">
-              سامانه پایش هوشمند تجهیزات و ملزومات پزشکی آوید
+              سامانه پایش هوشمند تجهیزات و ملزومات پزشکی هاسیار (Hosyar)
             </span>
           </div>
         </div>

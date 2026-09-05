@@ -56,7 +56,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
       rand += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     const num = Math.floor(1000 + Math.random() * 9000);
-    const newPass = `Avid@${rand}${num}`;
+    const newPass = `Hosyar@${rand}${num}`;
     setPassword(newPass);
     setCopiedPassword(false);
   };
@@ -72,7 +72,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   // Copy full user credentials formatted text
   const handleCopyFullCredentials = () => {
     const roleTitle = rolesList.find((r) => r.code === roleCode)?.titleFa || 'کاربر سیستم';
-    const text = `🏥 سامانه مدیریت تجهیزات پزشکی آوید
+    const text = `🏥 سامانه مدیریت تجهیزات پزشکی هاسیار (Hosyar)
 👤 مشخصات ورود به حساب کاربری:
 ───────────────
 • نام کاربر: ${fullName || 'تعریف‌نشده'}
@@ -82,7 +82,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 • نقش سازمانی: ${roleTitle}
 • بخش / دپارتمان: ${department || 'بدون بخش (شناور)'}
 ───────────────
-🔗 نشانی سامانه: https://avidmed.ir/login`;
+🔗 نشانی سامانه: https://hosyar.hospital/login`;
 
     navigator.clipboard.writeText(text);
     setCopiedFullCredentials(true);
@@ -154,7 +154,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
         'my_workgroup',
         'settings',
       ],
-      description: 'کاربر ایجادشده در سامانه مدیریت تجهیزات پزشکی آوید',
+      description: 'کاربر ایجادشده در سامانه مدیریت تجهیزات پزشکی هاسیار (Hosyar)',
     };
 
     onAddUser(newUser);
